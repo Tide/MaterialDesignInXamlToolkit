@@ -43,7 +43,10 @@ namespace MaterialDesignThemes.Wpf
             }
             
             colorPicker._inCallback = true;
-            colorPicker.SetCurrentValue(HsbProperty, ((Color)e.NewValue).ToHsb());
+            var color = (Color) e.NewValue;
+            colorPicker.SetCurrentValue(HsbProperty, color.ToHsb());
+            colorPicker.SetCurrentValue(AlphaProperty, color.A);
+            SetAlphaSliderBackgroundBrush(colorPicker, color);
             colorPicker._inCallback = false;
         }
 
@@ -73,18 +76,78 @@ namespace MaterialDesignThemes.Wpf
                 color = hsb.ToColor();
             }
             colorPicker.SetCurrentValue(ColorProperty, color);
+            SetAlphaSliderBackgroundBrush(colorPicker, color);
 
             colorPicker._inCallback = false;
         }
 
         public static readonly DependencyProperty HueSliderPositionProperty = DependencyProperty.Register(
-            nameof(HueSliderPosition), typeof(Dock), typeof(ColorPicker), new PropertyMetadata(Dock.Bottom));
+            nameof(HueSliderPosition), typeof(Dock), typeof(ColorPicker), new PropertyMetadata(Dock.Right));
 
         public Dock HueSliderPosition
         {
             get => (Dock)GetValue(HueSliderPositionProperty);
             set => SetValue(HueSliderPositionProperty, value);
         }
+
+        public static readonly DependencyProperty AlphaSliderPositionProperty = DependencyProperty.Register(
+            nameof(AlphaSliderPosition), typeof(Dock), typeof(ColorPicker), new PropertyMetadata(Dock.Right));
+
+        public Dock AlphaSliderPosition
+        {
+            get => (Dock)GetValue(AlphaSliderPositionProperty);
+            set => SetValue(AlphaSliderPositionProperty, value);
+        }
+
+        #region AlphaSliderBackgroundBrush Property
+        public static readonly DependencyProperty AlphaSliderBackgroundBrushProperty = DependencyProperty.Register("AlphaSliderBackgroundBrush", typeof(LinearGradientBrush), typeof(ColorPicker));
+
+        public LinearGradientBrush AlphaSliderBackgroundBrush
+        {
+            get => (LinearGradientBrush)GetValue(AlphaSliderBackgroundBrushProperty);
+            set => SetValue(AlphaSliderBackgroundBrushProperty, value);
+        }
+        #endregion
+
+        #region Alpha Property
+        public static readonly DependencyProperty AlphaProperty =
+            DependencyProperty.Register(nameof(Alpha), typeof(byte), typeof(ColorPicker), new FrameworkPropertyMetadata((byte)255, AlphaPropertyChangedCallback));
+
+        public byte Alpha
+        {
+            get => (byte)GetValue(AlphaProperty);
+            set => SetValue(AlphaProperty, value);
+        }
+
+        private static void AlphaPropertyChangedCallback(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var colorPicker = (ColorPicker)d;
+            if (colorPicker._inCallback) return;
+            if (!(e.NewValue is byte newValue)) return;
+            UpdateAlpha(colorPicker, newValue);
+        }
+
+        #endregion
+
+        #region ShowAlphaSlider Property
+        public static readonly DependencyProperty ShowAlphaSliderProperty =
+            DependencyProperty.Register(nameof(ShowAlphaSlider), typeof(bool), typeof(ColorPicker), new FrameworkPropertyMetadata(false, ShowAlphaSliderPropertyChangedCallback));
+
+        public bool ShowAlphaSlider
+        {
+            get => (bool)GetValue(ShowAlphaSliderProperty);
+            set => SetValue(ShowAlphaSliderProperty, value);
+        }
+
+        private static void ShowAlphaSliderPropertyChangedCallback(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var colorPicker = (ColorPicker)d;
+            //if (colorPicker._inCallback) return;
+            //if (!(e.NewValue is byte newValue)) return;
+            //UpdateAlpha(colorPicker, newValue);
+        }
+
+        #endregion
 
         public override void OnApplyTemplate()
         {
@@ -115,6 +178,22 @@ namespace MaterialDesignThemes.Wpf
             {
                 _hueSlider.ValueChanged += HueSliderOnValueChanged;
             }
+            
+            //if (AlphaSliderBackgroundBrush == null)
+            //{
+            //    // Set for horizontal display
+            //    //AlphaSliderBackgroundBrush = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 2.5) };
+
+            //    // Set for vertical display
+            //    AlphaSliderBackgroundBrush = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
+
+
+            //    var color = Colors.Black;
+            //    color.A = 0;
+            //    AlphaSliderBackgroundBrush.GradientStops.Add(new GradientStop(color, 0.0));
+            //    color.A = 255;
+            //    AlphaSliderBackgroundBrush.GradientStops.Add(new GradientStop(color, 1.0));
+            //}
 
             base.OnApplyTemplate();
         }
@@ -189,6 +268,45 @@ namespace MaterialDesignThemes.Wpf
             if (_saturationBrightnessCanvas == null) return;
             var top = ((1 - Hsb.Brightness) * _saturationBrightnessCanvas.ActualHeight);
             Canvas.SetTop(_saturationBrightnessThumb, top);
+        }
+
+        private static void UpdateAlpha(ColorPicker colorPicker, byte newValue)
+        {
+            colorPicker.SetCurrentValue(ColorProperty, AddTransparency(newValue, colorPicker.Color));
+        }
+
+        private static Color AddTransparency(byte alpha, Color color)
+        {
+            return Color.FromArgb(alpha, color.R, color.G, color.B);
+        }
+
+        private static void SetAlphaSliderBackgroundBrush(ColorPicker colorPicker, Color color)
+        {
+            if (colorPicker.AlphaSliderBackgroundBrush == null)
+            {
+                // Set for horizontal display
+                //AlphaSliderBackgroundBrush = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 2.5) };
+
+                // Set for vertical display
+                colorPicker.AlphaSliderBackgroundBrush = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
+
+                color.A = 0;
+                colorPicker.AlphaSliderBackgroundBrush.GradientStops.Add(new GradientStop(color, 0.0));
+                color.A = 255;
+                colorPicker.AlphaSliderBackgroundBrush.GradientStops.Add(new GradientStop(color, 1.0));
+            }
+
+            var alphaBrush = colorPicker.AlphaSliderBackgroundBrush;
+            if (alphaBrush.IsFrozen)
+            {
+                alphaBrush = alphaBrush.Clone();
+            }
+
+            color.A = 0;
+            alphaBrush.GradientStops[0].Color = color;
+            color.A = 255;
+            alphaBrush.GradientStops[1].Color = color;
+            colorPicker.SetCurrentValue(AlphaSliderBackgroundBrushProperty, alphaBrush);
         }
     }
 }
